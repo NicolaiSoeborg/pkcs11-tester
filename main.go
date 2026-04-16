@@ -13,7 +13,8 @@ import (
 
 const (
 	SLOT = 0
-	HsmPath = "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so"
+	//HsmPath = "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so"
+	HsmPath = "/usr/lib64/opensc-pkcs11.so"
 
 	CURVE25519_OID_RAW = "06032B656E"  // 1.3.101.110 ("id-X25519")
 	NoiseKeySize = 32
@@ -37,11 +38,11 @@ func main() {
 	}
 
 	// try to open a session on the slot
-	session, err := slots[SLOT].OpenWriteSession()
+	session, err := slots[SLOT].OpenSession()
 	if err != nil {
 		panic(fmt.Errorf("failed to open session on slot %d", SLOT))
 	}
-	fmt.Printf("OpenWriteSession on slot %d worked\n", SLOT)
+	fmt.Printf("OpenSession on slot %d worked\n", SLOT)
 
 	// try to login to the slot
 	fmt.Printf("Enter Pin for slot %d:\n", SLOT)
@@ -58,7 +59,9 @@ func main() {
 	privateAttrs := []*pkcs11.Attribute{
 		pkcs11.NewAttribute(pkcs11.CKA_EC_PARAMS, rawOID),
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PRIVATE_KEY),
-		pkcs11.NewAttribute(pkcs11.CKA_DERIVE, true),
+		//pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_EC),
+		pkcs11.NewAttribute(pkcs11.CKA_DERIVE, true),      // private key should be allowed to derive a shared secret
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),       // look only for "token objects" (persisted on HSM)
 	}
 
 	// FindObject expects a single key with above attrs, otherwise it returns err
@@ -75,8 +78,10 @@ func main() {
 	fmt.Printf("Found CKA_ID of privateKey: %s\n", ckaId)
 
 	publicAttrs := []*pkcs11.Attribute{
-		pkcs11.NewAttribute(pkcs11.CKA_EC_PARAMS, rawOID),
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PUBLIC_KEY),
+		//pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_EC),
+		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),       // look only for "token objects" (persisted on HSM)
+		pkcs11.NewAttribute(pkcs11.CKA_EC_PARAMS, rawOID), // public key be specified on the id-X25519 curve
 		pkcs11.NewAttribute(pkcs11.CKA_ID, ckaId),
 	}
 
