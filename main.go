@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/base64"
+	"flag"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/miekg/pkcs11"
@@ -12,26 +12,19 @@ import (
 )
 
 const (
-	SLOT = 0
-	//hsmPath = "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so"
-	//hsmPath = "/usr/lib64/opensc-pkcs11.so"
-	//hsmPath = "/opt/BouncyHsm/artifacts/.tmp/native/Linux-x64/BouncyHsm.Pkcs11Lib.so"
-
 	NoiseKeySize = 32
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "usage: %s <path to PKCS#11 library>\n", os.Args[0])
-		os.Exit(1)
-	}
-	hsmPath := os.Args[1]
+	hsmPath := flag.String("hsmPath", "opensc-pkcs11.so", "path/name of PKCS#11 library")
+	slot := flag.Int("slot", 0, "slot number to use")
+	flag.Parse()
 
-	module, err := p11.OpenModule(hsmPath)
+	module, err := p11.OpenModule(*hsmPath)
 	if err != nil {
-		panic(fmt.Errorf("[ERR] failed to load module library: %s", hsmPath))
+		panic(fmt.Errorf("[ERR] failed to load module library: %s", *hsmPath))
 	}
-	fmt.Printf("[OK] Module '%s' loaded correctly\n", hsmPath)
+	fmt.Printf("[OK] Module '%s' loaded correctly\n", *hsmPath)
 	defer module.Destroy()
 
 	slots, err := module.Slots()
@@ -40,20 +33,20 @@ func main() {
 	}
 	fmt.Printf("Found %d slots\n", len(slots))
 
-	if uint(len(slots)) <= SLOT {
-		panic(fmt.Errorf("[ERR] Requested slot (%d) but only %d available", SLOT, len(slots)))
+	if len(slots) <= *slot {
+		panic(fmt.Errorf("[ERR] Requested slot (%d) but only %d available", *slot, len(slots)))
 	}
 
 	// try to open a session on the slot
-	session, err := slots[SLOT].OpenSession()
+	session, err := slots[*slot].OpenSession()
 	if err != nil {
-		panic(fmt.Errorf("[ERR] failed to open session on slot %d", SLOT))
+		panic(fmt.Errorf("[ERR] failed to open session on slot %d", *slot))
 	}
-	fmt.Printf("[OK] OpenSession on slot %d worked\n", SLOT)
+	fmt.Printf("[OK] OpenSession on slot %d worked\n", *slot)
 	defer session.Close()
 
 	// try to login to the slot
-	fmt.Printf("Enter Pin for slot %d:\n", SLOT)
+	fmt.Printf("Enter Pin for slot %d:\n", *slot)
 	userPin, _ := term.ReadPassword(0) // no echo
 	pin := strings.TrimSpace(string(userPin))
 	err = session.Login(pin)
@@ -69,7 +62,7 @@ func main() {
 		pkcs11.NewAttribute(pkcs11.CKA_EC_PARAMS, X25519_OID),
 		pkcs11.NewAttribute(pkcs11.CKA_CLASS, pkcs11.CKO_PRIVATE_KEY),
 		//pkcs11.NewAttribute(pkcs11.CKA_KEY_TYPE, pkcs11.CKK_EC_MONTGOMERY),
-		pkcs11.NewAttribute(pkcs11.CKA_ALLOWED_MECHANISMS, pkcs11.CKM_ECDH1_DERIVE),
+		//pkcs11.NewAttribute(pkcs11.CKA_ALLOWED_MECHANISMS, pkcs11.CKM_ECDH1_DERIVE),
 		pkcs11.NewAttribute(pkcs11.CKA_DERIVE, true), // private key should be allowed to derive a shared secret
 		pkcs11.NewAttribute(pkcs11.CKA_TOKEN, true),  // look only for "token objects" (persisted on HSM)
 	}
