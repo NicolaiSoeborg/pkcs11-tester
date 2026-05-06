@@ -1,0 +1,27 @@
+FROM golang:1.24-bookworm
+
+RUN apt-get update && apt-get install -y \
+    gcc-mips-linux-gnu \
+    libc6-dev-mips-cross \
+    && rm -rf /var/lib/apt/lists/* \
+    && touch /usr/mips-linux-gnu/include/gnu/stubs-o32_soft.h
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ENV GOOS=linux \
+    GOARCH=mips \
+    GOMIPS=softfloat \
+    CGO_ENABLED=1 \
+    CC=mips-linux-gnu-gcc \
+    CGO_CFLAGS="-march=mips32r2 -msoft-float" \
+    CGO_LDFLAGS="-static"
+
+RUN go build \
+    -ldflags="-extldflags '-static' -s -w" \
+    -o /out/pkcs11-tester-mips32 \
+    .
